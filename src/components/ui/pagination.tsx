@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { cn } from "@/src/app/lib/utils";
+import { cn } from "@/src/lib/utils";
 import { Button } from "@/src/components/ui/button";
 import {
   ChevronLeftIcon,
