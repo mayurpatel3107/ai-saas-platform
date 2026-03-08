@@ -1,10 +1,18 @@
 "use client";
-import { Card, CardContent } from "@/src/components/ui/card";
+
 import { z } from "zod";
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+import { OctagonAlertIcon } from "lucide-react";
+import { FaGithub, FaGoogle } from "react-icons/fa";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Input } from "@/src/components/ui/input";
+import { authClient } from "@/src/lib/auth-client";
 import { Button } from "@/src/components/ui/button";
+import { Card, CardContent } from "@/src/components/ui/card";
 import { Alert, AlertTitle } from "@/src/components/ui/alert";
 import {
   Form,
@@ -15,24 +23,22 @@ import {
   FormMessage,
 } from "@/src/components/ui/form";
 
-import { useForm } from "react-hook-form";
-import { OctagonAlertIcon } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { authClient } from "@/src/lib/auth-client";
-import { useState } from "react";
-
 const formSchema = z.object({
   email: z.string().email(),
-  password: z
-    .string()
-    .min(6, { message: "Password must be at least 6 characters long" }),
+  password: z.string().min(1, { message: "Password is required" }),
 });
 
 export const SignInView = () => {
   const router = useRouter();
+
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -41,30 +47,52 @@ export const SignInView = () => {
     },
   });
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = (data: z.infer<typeof formSchema>) => {
     setError(null);
-    setLoading(true);
-    try {
-      const res = await authClient.signIn.email(
-        {
-          email: data.email,
-          password: data.password,
+    setPending(true);
+
+    authClient.signIn.email(
+      {
+        email: data.email,
+        password: data.password,
+        callbackURL: "/",
+      },
+      {
+        onSuccess: () => {
+          setPending(false);
+          router.push("/");
         },
-        {
-          onSuccess: () => {
-            router.push("/");
-          },
-          onError: (ctx) => {
-            setError(ctx.error.message);
-          },
+        onError: ({ error }) => {
+          setPending(false);
+          setError(error.message);
         },
-      );
-      setLoading(false);
-    } catch (error) {
-      setError("Something went wrong. Please try again later.");
-      setLoading(false);
-    }
+      },
+    );
   };
+
+  const onSocial = (provider: "github" | "google") => {
+    setError(null);
+    setPending(true);
+
+    authClient.signIn.social(
+      {
+        provider: provider,
+        callbackURL: "/",
+      },
+      {
+        onSuccess: () => {
+          setPending(false);
+        },
+        onError: ({ error }) => {
+          setPending(false);
+          setError(error.message);
+        },
+      },
+    );
+  };
+
+  if (!mounted) return null;
+
   return (
     <div className="flex flex-col gap-6">
       <Card className="overflow-hidden p-0">
@@ -78,7 +106,6 @@ export const SignInView = () => {
                     Login to your account
                   </p>
                 </div>
-
                 <div className="grid gap-3">
                   <FormField
                     control={form.control}
@@ -98,7 +125,6 @@ export const SignInView = () => {
                     )}
                   />
                 </div>
-
                 <div className="grid gap-3">
                   <FormField
                     control={form.control}
@@ -118,46 +144,47 @@ export const SignInView = () => {
                     )}
                   />
                 </div>
-
                 {!!error && (
                   <Alert className="bg-destructive/10 border-none">
-                    <OctagonAlertIcon className="h-4 w-4 !text-destructive" />
-                    <AlertTitle className="text-destructive">
-                      {error}
-                    </AlertTitle>
+                    <OctagonAlertIcon className="h-4 w-4 text-destructive!" />
+                    <AlertTitle>{error}</AlertTitle>
                   </Alert>
                 )}
-
-                <Button disabled={loading} className="w-full" type="submit">
-                  Sign In
+                <Button disabled={pending} type="submit" className="w-full">
+                  Sign in
                 </Button>
-
-                <div
-                  className="after:border-border relative text-center text-sm 
-                after:absolute after:inset-0 after:top-1/2 after:z-0 
-                after:flex after:items-center after:border-t"
-                >
+                <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
                   <span className="bg-card text-muted-foreground relative z-10 px-2">
                     Or continue with
                   </span>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
-                  <Button variant="outline" type="button" className="w-full">
-                    Google
+                  <Button
+                    disabled={pending}
+                    onClick={() => onSocial("google")}
+                    variant="outline"
+                    type="button"
+                    className="w-full"
+                  >
+                    <FaGoogle />
                   </Button>
-                  <Button variant="outline" type="button" className="w-full">
-                    GitHub
+                  <Button
+                    disabled={pending}
+                    onClick={() => onSocial("github")}
+                    variant="outline"
+                    type="button"
+                    className="w-full"
+                  >
+                    <FaGithub />
                   </Button>
                 </div>
-
                 <div className="text-center text-sm">
-                  Don't have an account?{" "}
+                  Don&apos;t have an account?{" "}
                   <Link
                     href="/sign-up"
                     className="underline underline-offset-4"
                   >
-                    Sign Up
+                    Sign up
                   </Link>
                 </div>
               </div>
@@ -172,7 +199,8 @@ export const SignInView = () => {
           </div>
         </CardContent>
       </Card>
-      <div className="text-muted-foreground [&_a]:hover:text-primary text-center text-xs text-balance [&_a]:underline [&_a]:underline-offset-4">
+
+      <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
         By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
         and <a href="#">Privacy Policy</a>
       </div>
